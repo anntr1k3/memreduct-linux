@@ -1,0 +1,12 @@
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/ksni/595f41c098d2fcf7/out/ksni-595f41c098d2fcf7.d: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/compat.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/dbus_interface.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/menu/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/service.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/tray.rs
+
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/ksni/595f41c098d2fcf7/out/libksni-595f41c098d2fcf7.rlib: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/compat.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/dbus_interface.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/menu/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/service.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/tray.rs
+
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/ksni/595f41c098d2fcf7/out/libksni-595f41c098d2fcf7.rmeta: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/compat.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/dbus_interface.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/menu/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/service.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/tray.rs
+
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/lib.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/compat.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/dbus_interface.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/menu/mod.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/service.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ksni-0.3.7/src/tray.rs:

@@ -1,0 +1,14 @@
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/5de6b1e32c91c544/out/serde-5de6b1e32c91c544.d: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/aae00067ca4a6475/out/private.rs
+
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/5de6b1e32c91c544/out/libserde-5de6b1e32c91c544.rlib: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/aae00067ca4a6475/out/private.rs
+
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/5de6b1e32c91c544/out/libserde-5de6b1e32c91c544.rmeta: /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/aae00067ca4a6475/out/private.rs
+
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/home/kami/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/aae00067ca4a6475/out/private.rs:
+
+# env-dep:OUT_DIR=/home/kami/.gemini/antigravity/scratch/memreduct-linux/target/debug/build/serde/aae00067ca4a6475/out

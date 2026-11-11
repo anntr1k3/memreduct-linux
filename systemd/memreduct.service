@@ -1,0 +1,25 @@
+[Unit]
+Description=Mem Reduct Privileged Memory Daemon
+Documentation=https://github.com/kami/memreduct-linux
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/memreduct-daemon
+Restart=on-failure
+RestartSec=3s
+
+# Runtime directory will be created at /run/memreduct
+RuntimeDirectory=memreduct
+RuntimeDirectoryMode=0755
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/proc/sys/vm
+ProtectKernelTunables=no
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_RESOURCE
+AmbientCapabilities=CAP_SYS_ADMIN
+
+[Install]
+WantedBy=multi-user.target

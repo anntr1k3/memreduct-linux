@@ -17,7 +17,7 @@ struct Cli {
     command: Option<Commands>,
 
     /// Custom socket path for daemon IPC
-    #[arg(short, long, global = true)]
+    #[arg(long, global = true)]
     socket: Option<PathBuf>,
 
     /// Output in JSON format

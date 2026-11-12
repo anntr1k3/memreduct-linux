@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Mem Reduct
+GenericName=Memory Cleaner
+Comment=System Memory Monitor & Cleaner
+Exec=memreduct-tray
+Icon=memreduct
+Terminal=false
+Categories=System;Monitor;Utility;
+Keywords=memory;ram;cleaner;reduct;cache;
+StartupNotify=false

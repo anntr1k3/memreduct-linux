@@ -62,6 +62,10 @@ enum Commands {
         /// Full clean: all caches, compaction, and safe swap flush
         #[arg(short = 'a', long)]
         all: bool,
+
+        /// Send desktop notification with result
+        #[arg(short = 'n', long)]
+        notify: bool,
     },
 
     /// Ping the memreduct-daemon to check status
@@ -106,9 +110,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             compact,
             swap,
             all,
+            notify,
         } => {
             let target = determine_target(caches, pagecache, dentries, compact, swap, all);
-            execute_clean(target, &socket_path, cli.json).await?;
+            execute_clean(target, &socket_path, cli.json, notify).await?;
         }
     }
 
@@ -145,11 +150,15 @@ async fn execute_clean(
     target: CleanTarget,
     socket_path: &PathBuf,
     json_output: bool,
+    notify: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // If running as root, clean directly!
     if Cleaner::is_privileged() {
         println!("{}", "Running with root privileges. Executing directly...".cyan());
         let res = Cleaner::clean(target)?;
+        if notify {
+            send_desktop_notification(&res);
+        }
         display_clean_result(&res, json_output)?;
         return Ok(());
     }
@@ -157,6 +166,9 @@ async fn execute_clean(
     // Otherwise, try connecting to the daemon
     match send_ipc_request(socket_path, &IpcRequest::Clean(target)) {
         Ok(IpcResponse::CleanResult(res)) => {
+            if notify {
+                send_desktop_notification(&res);
+            }
             display_clean_result(&res, json_output)?;
             return Ok(());
         }
@@ -213,6 +225,29 @@ async fn execute_clean(
             std::process::exit(1);
         }
     }
+}
+
+fn send_desktop_notification(res: &CleanResult) {
+    let freed = res.freed_bytes;
+    let freed_str = if freed >= 0 {
+        format_bytes(freed as u64)
+    } else {
+        format!("-{}", format_bytes((-freed) as u64))
+    };
+    let body = format!(
+        "Освобождено: {}\nЗанято: {:.1}% ({})",
+        freed_str,
+        res.after.used_percent(),
+        format_bytes(res.after.used_bytes)
+    );
+    let _ = Command::new("notify-send")
+        .arg("-a")
+        .arg("Mem Reduct")
+        .arg("Память очищена")
+        .arg(body)
+        .arg("-i")
+        .arg("utilities-system-monitor")
+        .spawn();
 }
 
 fn display_clean_result(res: &CleanResult, json: bool) -> Result<(), Box<dyn std::error::Error>> {

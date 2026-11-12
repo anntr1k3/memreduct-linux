@@ -4,12 +4,14 @@ use ksni::{Icon, ToolTip, Tray, TrayMethods};
 use memreduct_core::cleaner::{CleanResult, CleanTarget, Cleaner};
 use memreduct_core::ipc::{resolve_socket_path, send_ipc_request, IpcRequest, IpcResponse};
 use memreduct_core::metrics::{format_bytes, MemoryMetrics};
+use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::process::Command;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(name = "memreduct-tray")]
@@ -20,7 +22,7 @@ struct Args {
     interval: f64,
 
     /// Custom daemon socket path
-    #[arg(short, long)]
+    #[arg(long)]
     socket: Option<PathBuf>,
 }
 
@@ -37,60 +39,136 @@ const DIGITS: [u16; 10] = [
     0b111_101_111_001_111, // 9
 ];
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TrayConfig {
+    pub threshold_enabled: bool,
+    pub threshold_pct: f64,
+    pub timer_enabled: bool,
+    pub timer_minutes: u64,
+    pub notify_on_clean: bool,
+}
+
+impl Default for TrayConfig {
+    fn default() -> Self {
+        Self {
+            threshold_enabled: false,
+            threshold_pct: 80.0,
+            timer_enabled: false,
+            timer_minutes: 30,
+            notify_on_clean: true,
+        }
+    }
+}
+
+impl TrayConfig {
+    fn config_path() -> PathBuf {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        PathBuf::from(home).join(".config/memreduct/tray_config.json")
+    }
+
+    fn load() -> Self {
+        let path = Self::config_path();
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(cfg) = serde_json::from_str(&content) {
+                return cfg;
+            }
+        }
+        Self::default()
+    }
+
+    fn save(&self) {
+        let path = Self::config_path();
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = fs::write(path, json);
+        }
+    }
+}
+
 struct MemReductTray {
     metrics: Option<MemoryMetrics>,
     socket_path: PathBuf,
-    autoclean_threshold_enabled: Arc<AtomicBool>,
-    autoclean_threshold_pct: f64,
+    config: Arc<Mutex<TrayConfig>>,
     last_cleaned_msg: Option<String>,
+    last_clean_time: Arc<Mutex<Instant>>,
 }
 
 impl MemReductTray {
     fn new(socket_path: PathBuf) -> Self {
         let metrics = MemoryMetrics::fetch().ok();
+        let config = Arc::new(Mutex::new(TrayConfig::load()));
         Self {
             metrics,
             socket_path,
-            autoclean_threshold_enabled: Arc::new(AtomicBool::new(false)),
-            autoclean_threshold_pct: 80.0,
+            config,
             last_cleaned_msg: None,
+            last_clean_time: Arc::new(Mutex::new(Instant::now())),
         }
     }
 
     fn update_metrics(&mut self) {
         if let Ok(m) = MemoryMetrics::fetch() {
-            // Check autoclean
-            if self.autoclean_threshold_enabled.load(Ordering::Relaxed)
-                && m.used_percent() >= self.autoclean_threshold_pct
-            {
+            let cfg = { self.config.lock().unwrap().clone() };
+
+            // 1. Check Threshold Autoclean
+            if cfg.threshold_enabled && m.used_percent() >= cfg.threshold_pct {
                 info!(
                     "RAM usage ({:.1}%) exceeded threshold ({:.1}%). Triggering autoclean...",
                     m.used_percent(),
-                    self.autoclean_threshold_pct
+                    cfg.threshold_pct
                 );
-                let _ = self.trigger_clean(CleanTarget::AllCaches);
+                let _ = self.trigger_clean(CleanTarget::AllCaches, true);
             }
+
+            // 2. Check Timer Autoclean
+            if cfg.timer_enabled {
+                let elapsed_mins = {
+                    let last = self.last_clean_time.lock().unwrap();
+                    last.elapsed().as_secs() / 60
+                };
+                if elapsed_mins >= cfg.timer_minutes {
+                    info!("Timer autoclean triggered (every {} min)...", cfg.timer_minutes);
+                    let _ = self.trigger_clean(CleanTarget::AllCaches, true);
+                }
+            }
+
             self.metrics = Some(m);
         }
     }
 
-    fn trigger_clean(&mut self, target: CleanTarget) -> Result<CleanResult, String> {
-        if Cleaner::is_privileged() {
+    fn trigger_clean(&mut self, target: CleanTarget, is_auto: bool) -> Result<CleanResult, String> {
+        let res = if Cleaner::is_privileged() {
             Cleaner::clean(target).map_err(|e| e.to_string())
         } else {
             match send_ipc_request(&self.socket_path, &IpcRequest::Clean(target)) {
-                Ok(IpcResponse::CleanResult(res)) => {
-                    self.last_cleaned_msg = Some(format!(
-                        "Freed {}",
-                        format_bytes(res.freed_bytes.max(0) as u64)
-                    ));
-                    Ok(res)
-                }
+                Ok(IpcResponse::CleanResult(res)) => Ok(res),
                 Ok(IpcResponse::Error(e)) => Err(e),
                 Ok(_) => Err("Unexpected response from daemon".into()),
                 Err(e) => Err(format!("Daemon unreachable: {}", e)),
             }
+        };
+
+        if let Ok(ref clean_res) = res {
+            *self.last_clean_time.lock().unwrap() = Instant::now();
+            let freed_str = format_bytes(clean_res.freed_bytes.max(0) as u64);
+            self.last_cleaned_msg = Some(format!("Freed {}", freed_str));
+
+            let cfg = { self.config.lock().unwrap().clone() };
+            if cfg.notify_on_clean {
+                let prefix = if is_auto { "Автоочистка памяти" } else { "Очистка памяти" };
+                let body = format!(
+                    "Освобождено: {}\nЗанято: {:.1}% ({})",
+                    freed_str,
+                    clean_res.after.used_percent(),
+                    format_bytes(clean_res.after.used_bytes)
+                );
+                send_desktop_notification(prefix, &body);
+            }
         }
+
+        res
     }
 
     fn generate_icon(&self) -> Icon {
@@ -114,18 +192,17 @@ impl MemReductTray {
             (231, 76, 60) // Red
         };
 
-        // Draw dark rounded background
+        // Dark rounded background
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
                 let idx = (y * WIDTH + x) * 4;
-                // Rounded corner check (radius 4)
                 let is_corner = (x < 3 && y < 3 && (3 - x) * (3 - x) + (3 - y) * (3 - y) > 9)
                     || (x >= 21 && y < 3 && (x - 20) * (x - 20) + (3 - y) * (3 - y) > 9)
                     || (x < 3 && y >= 21 && (3 - x) * (3 - x) + (y - 20) * (y - 20) > 9)
                     || (x >= 21 && y >= 21 && (x - 20) * (x - 20) + (y - 20) * (y - 20) > 9);
 
                 if !is_corner {
-                    pixels[idx] = 230; // Alpha
+                    pixels[idx] = 235; // Alpha
                     pixels[idx + 1] = 24; // R
                     pixels[idx + 2] = 24; // G
                     pixels[idx + 3] = 37; // B (dark slate)
@@ -133,7 +210,7 @@ impl MemReductTray {
             }
         }
 
-        // Draw bottom progress gauge bar (y = 20..22)
+        // Draw bottom gauge bar (y = 20..22)
         let fill_w = ((pct as f64 / 100.0) * (WIDTH - 4) as f64).round() as usize;
         for y in 20..22 {
             for x in 2..(2 + fill_w).min(WIDTH - 2) {
@@ -145,13 +222,11 @@ impl MemReductTray {
             }
         }
 
-        // Render 2 digits centered (each digit 3x5 scaled 2x => 6x10)
+        // Render digits
         let d1 = (pct / 10) as usize % 10;
         let d2 = (pct % 10) as usize;
 
-        // Digit 1: x = 4..10, y = 5..15
         draw_digit_scaled_2x(&mut pixels, WIDTH, 4, 5, d1);
-        // Digit 2: x = 12..18, y = 5..15
         draw_digit_scaled_2x(&mut pixels, WIDTH, 13, 5, d2);
 
         Icon {
@@ -168,7 +243,6 @@ fn draw_digit_scaled_2x(pixels: &mut [u8], stride: usize, start_x: usize, start_
         for col in 0..3 {
             let bit_pos = 14 - (row * 3 + col);
             if (font_bits >> bit_pos) & 1 == 1 {
-                // Draw 2x2 block
                 for dy in 0..2 {
                     for dx in 0..2 {
                         let px = start_x + col * 2 + dx;
@@ -185,6 +259,17 @@ fn draw_digit_scaled_2x(pixels: &mut [u8], stride: usize, start_x: usize, start_
             }
         }
     }
+}
+
+fn send_desktop_notification(summary: &str, body: &str) {
+    let _ = Command::new("notify-send")
+        .arg("-a")
+        .arg("Mem Reduct")
+        .arg(summary)
+        .arg(body)
+        .arg("-i")
+        .arg("utilities-system-monitor")
+        .spawn();
 }
 
 impl Tray for MemReductTray {
@@ -302,15 +387,7 @@ impl Tray for MemReductTray {
                 label: "⚡ Clean All Caches".into(),
                 icon_name: "edit-clear".into(),
                 activate: Box::new(|this: &mut Self| {
-                    match this.trigger_clean(CleanTarget::AllCaches) {
-                        Ok(res) => {
-                            info!("Clean caches succeeded: freed {} bytes", res.freed_bytes);
-                        }
-                        Err(e) => {
-                            warn!("Clean caches failed: {}", e);
-                            this.last_cleaned_msg = Some(format!("Error: {}", e));
-                        }
-                    }
+                    let _ = this.trigger_clean(CleanTarget::AllCaches, false);
                 }),
                 ..Default::default()
             }
@@ -322,15 +399,7 @@ impl Tray for MemReductTray {
                 label: "🧹 Full Clean (Caches + Compact + Swap)".into(),
                 icon_name: "edit-clear-all".into(),
                 activate: Box::new(|this: &mut Self| {
-                    match this.trigger_clean(CleanTarget::All) {
-                        Ok(res) => {
-                            info!("Full clean succeeded: freed {} bytes", res.freed_bytes);
-                        }
-                        Err(e) => {
-                            warn!("Full clean failed: {}", e);
-                            this.last_cleaned_msg = Some(format!("Error: {}", e));
-                        }
-                    }
+                    let _ = this.trigger_clean(CleanTarget::All, false);
                 }),
                 ..Default::default()
             }
@@ -342,7 +411,7 @@ impl Tray for MemReductTray {
                 label: "🗜 Compact Memory".into(),
                 icon_name: "system-run".into(),
                 activate: Box::new(|this: &mut Self| {
-                    let _ = this.trigger_clean(CleanTarget::CompactMemory);
+                    let _ = this.trigger_clean(CleanTarget::CompactMemory, false);
                 }),
                 ..Default::default()
             }
@@ -354,7 +423,7 @@ impl Tray for MemReductTray {
                 label: "🔄 Safe Swap Reset".into(),
                 icon_name: "view-refresh".into(),
                 activate: Box::new(|this: &mut Self| {
-                    let _ = this.trigger_clean(CleanTarget::Swap);
+                    let _ = this.trigger_clean(CleanTarget::Swap, false);
                 }),
                 ..Default::default()
             }
@@ -364,23 +433,60 @@ impl Tray for MemReductTray {
         items.push(MenuItem::Separator);
 
         // Autoclean Submenu
-        let autoclean_active = self.autoclean_threshold_enabled.load(Ordering::Relaxed);
-        let autoclean_toggle_label = if autoclean_active {
-            format!("Disable Autoclean (>{}% RAM)", self.autoclean_threshold_pct as u32)
+        let cfg = { self.config.lock().unwrap().clone() };
+
+        let threshold_label = if cfg.threshold_enabled {
+            format!("✔ Очистка при RAM > {}% (Вкл)", cfg.threshold_pct as u32)
         } else {
-            format!("Enable Autoclean (>{}% RAM)", self.autoclean_threshold_pct as u32)
+            format!("  Очистка при RAM > {}% (Выкл)", cfg.threshold_pct as u32)
         };
 
-        let flag_clone = self.autoclean_threshold_enabled.clone();
+        let timer_label = if cfg.timer_enabled {
+            format!("✔ Очистка каждые {} мин (Вкл)", cfg.timer_minutes)
+        } else {
+            format!("  Очистка каждые {} мин (Выкл)", cfg.timer_minutes)
+        };
+
+        let notify_label = if cfg.notify_on_clean {
+            "✔ Всплывающие уведомления (Вкл)".to_string()
+        } else {
+            "  Всплывающие уведомления (Выкл)".to_string()
+        };
+
+        let cfg_clone1 = self.config.clone();
+        let cfg_clone2 = self.config.clone();
+        let cfg_clone3 = self.config.clone();
+
         items.push(
             SubMenu {
-                label: "⚙ Autoclean Settings".into(),
+                label: "⚙ Настройки автоочистки".into(),
                 submenu: vec![
                     StandardItem {
-                        label: autoclean_toggle_label,
+                        label: threshold_label,
                         activate: Box::new(move |_| {
-                            let curr = flag_clone.load(Ordering::Relaxed);
-                            flag_clone.store(!curr, Ordering::Relaxed);
+                            let mut c = cfg_clone1.lock().unwrap();
+                            c.threshold_enabled = !c.threshold_enabled;
+                            c.save();
+                        }),
+                        ..Default::default()
+                    }
+                    .into(),
+                    StandardItem {
+                        label: timer_label,
+                        activate: Box::new(move |_| {
+                            let mut c = cfg_clone2.lock().unwrap();
+                            c.timer_enabled = !c.timer_enabled;
+                            c.save();
+                        }),
+                        ..Default::default()
+                    }
+                    .into(),
+                    StandardItem {
+                        label: notify_label,
+                        activate: Box::new(move |_| {
+                            let mut c = cfg_clone3.lock().unwrap();
+                            c.notify_on_clean = !c.notify_on_clean;
+                            c.save();
                         }),
                         ..Default::default()
                     }

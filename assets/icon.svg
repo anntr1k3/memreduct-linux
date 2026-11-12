@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e2e"/>
+      <stop offset="100%" stop-color="#11111b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2ecc71"/>
+      <stop offset="100%" stop-color="#27ae60"/>
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f1c40f"/>
+      <stop offset="100%" stop-color="#e67e22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base Rounded Rectangle -->
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bgGrad)" stroke="#313244" stroke-width="3"/>
+
+  <!-- RAM Module outline -->
+  <rect x="24" y="34" width="80" height="52" rx="8" fill="#181825" stroke="#45475a" stroke-width="2.5"/>
+
+  <!-- RAM Pins -->
+  <g fill="#cdd6f4" opacity="0.6">
+    <rect x="32" y="86" width="6" height="8" rx="1.5"/>
+    <rect x="44" y="86" width="6" height="8" rx="1.5"/>
+    <rect x="56" y="86" width="6" height="8" rx="1.5"/>
+    <rect x="68" y="86" width="6" height="8" rx="1.5"/>
+    <rect x="80" y="86" width="6" height="8" rx="1.5"/>
+    <rect x="92" y="86" width="6" height="8" rx="1.5"/>
+  </g>
+
+  <!-- RAM Chips -->
+  <rect x="32" y="44" width="16" height="24" rx="3" fill="#313244"/>
+  <rect x="56" y="44" width="16" height="24" rx="3" fill="#313244"/>
+  <rect x="80" y="44" width="16" height="24" rx="3" fill="#313244"/>
+
+  <!-- Active Gauge Accent Bar -->
+  <rect x="24" y="98" width="80" height="6" rx="3" fill="url(#accentGrad)"/>
+
+  <!-- Lightning Bolt (Reduction / Clean) -->
+  <polygon points="68,20 50,62 64,62 58,102 82,54 68,54" fill="url(#boltGrad)" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))"/>
+</svg>

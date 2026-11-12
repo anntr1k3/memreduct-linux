@@ -2,6 +2,10 @@
 
 A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% Rust** inspired by [henrypp/memreduct](https://github.com/henrypp/memreduct).
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="Mem Reduct Linux Tray Menu" width="380" />
+</p>
+
 Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11, KDE) with a secure **Client-Server architecture**.
 
 ---

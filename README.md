@@ -1,5 +1,9 @@
 # Mem Reduct (Linux Edition)
 
+<p align="center">
+  <b>English</b> | <a href="README.ru.md">🇷🇺 Читать на русском</a>
+</p>
+
 A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% Rust** inspired by [henrypp/memreduct](https://github.com/henrypp/memreduct).
 
 <p align="center">

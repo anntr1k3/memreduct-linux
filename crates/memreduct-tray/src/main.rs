@@ -292,9 +292,9 @@ impl Tray for MemReductTray {
     fn tool_tip(&self) -> ToolTip {
         if let Some(m) = &self.metrics {
             ToolTip {
-                title: format!("Mem Reduct: {:.1}% Used", m.used_percent()),
+                title: format!("Mem Reduct: {:.1}% Занято", m.used_percent()),
                 description: format!(
-                    "Used: {} / {}\nAvailable: {}\nCaches: {}\nSwap: {}",
+                    "Занято: {} / {}\nДоступно: {}\nКэши: {}\nSwap: {}",
                     format_bytes(m.used_bytes),
                     format_bytes(m.total_bytes),
                     format_bytes(m.available_bytes),
@@ -307,7 +307,7 @@ impl Tray for MemReductTray {
         } else {
             ToolTip {
                 title: "Mem Reduct (Linux)".into(),
-                description: "Monitoring system memory...".into(),
+                description: "Мониторинг оперативной памяти...".into(),
                 icon_name: "utilities-system-monitor".into(),
                 icon_pixmap: Vec::new(),
             }
@@ -319,7 +319,7 @@ impl Tray for MemReductTray {
 
         if let Some(m) = &self.metrics {
             let header = format!(
-                "RAM: {:.1}% ({} / {})",
+                "ОЗУ: {:.1}% ({} / {})",
                 m.used_percent(),
                 format_bytes(m.used_bytes),
                 format_bytes(m.total_bytes)
@@ -335,7 +335,7 @@ impl Tray for MemReductTray {
 
             items.push(
                 StandardItem {
-                    label: format!("Available: {}", format_bytes(m.available_bytes)),
+                    label: format!("Доступно: {}", format_bytes(m.available_bytes)),
                     enabled: false,
                     ..Default::default()
                 }
@@ -344,7 +344,7 @@ impl Tray for MemReductTray {
 
             items.push(
                 StandardItem {
-                    label: format!("Caches: {}", format_bytes(m.reclaimable_cache_bytes)),
+                    label: format!("Кэши: {}", format_bytes(m.reclaimable_cache_bytes)),
                     enabled: false,
                     ..Default::default()
                 }
@@ -371,7 +371,7 @@ impl Tray for MemReductTray {
             items.push(MenuItem::Separator);
             items.push(
                 StandardItem {
-                    label: format!("Last clean: {}", msg),
+                    label: format!("Очистка: {}", msg),
                     enabled: false,
                     ..Default::default()
                 }
@@ -384,7 +384,7 @@ impl Tray for MemReductTray {
         // Actions
         items.push(
             StandardItem {
-                label: "⚡ Clean All Caches".into(),
+                label: "⚡ Очистить все кэши".into(),
                 icon_name: "edit-clear".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::AllCaches, false);
@@ -396,7 +396,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🧹 Full Clean (Caches + Compact + Swap)".into(),
+                label: "🧹 Полная очистка (Кэш + Сжатие + Swap)".into(),
                 icon_name: "edit-clear-all".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::All, false);
@@ -408,7 +408,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🗜 Compact Memory".into(),
+                label: "🗜 Дефрагментация памяти (HugePages)".into(),
                 icon_name: "system-run".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::CompactMemory, false);
@@ -420,7 +420,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🔄 Safe Swap Reset".into(),
+                label: "🔄 Безопасный сброс Swap".into(),
                 icon_name: "view-refresh".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::Swap, false);
@@ -501,7 +501,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "Quit Mem Reduct".into(),
+                label: "Выход из Mem Reduct".into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(|_| {
                     info!("Quit requested from tray menu. Exiting.");

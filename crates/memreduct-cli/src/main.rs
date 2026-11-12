@@ -227,6 +227,29 @@ async fn execute_clean(
     }
 }
 
+fn is_ru() -> bool {
+    std::env::var("LANG")
+        .or_else(|_| std::env::var("LC_ALL"))
+        .or_else(|_| std::env::var("LC_MESSAGES"))
+        .map(|l| l.to_lowercase().starts_with("ru"))
+        .unwrap_or(false)
+}
+
+fn translate_action(act: &str) -> String {
+    if !is_ru() {
+        return act.to_string();
+    }
+    match act {
+        "Flushed dirty pages and dropped Page Cache (1)" => "Сброшены грязные страницы и кэш файлов (1)".into(),
+        "Flushed dirty pages and dropped Dentries & Inodes (2)" => "Сброшены грязные страницы и кэш метаданных (2)".into(),
+        "Flushed dirty pages and dropped All Caches (3)" => "Сброшены грязные страницы и все кэши ядра (3)".into(),
+        "Compacted physical memory (HugePages defragmentation)" | "Compacted physical memory" => "Выполнена дефрагментация физической памяти (HugePages)".into(),
+        "Safely flushed Swap into RAM and re-enabled Swap" => "Файл подкачки (Swap) безопасно сброшен в ОЗУ и перезапущен".into(),
+        "Swap is already empty, skipped swap reset" => "Файл подкачки пуст, сброс пропущен".into(),
+        other => other.to_string(),
+    }
+}
+
 fn send_desktop_notification(res: &CleanResult) {
     let freed = res.freed_bytes;
     let freed_str = if freed >= 0 {
@@ -234,16 +257,27 @@ fn send_desktop_notification(res: &CleanResult) {
     } else {
         format!("-{}", format_bytes((-freed) as u64))
     };
-    let body = format!(
-        "Освобождено: {}\nЗанято: {:.1}% ({})",
-        freed_str,
-        res.after.used_percent(),
-        format_bytes(res.after.used_bytes)
-    );
+    let ru = is_ru();
+    let title = if ru { "Mem Reduct: Память очищена" } else { "Mem Reduct: Memory Cleaned" };
+    let body = if ru {
+        format!(
+            "Освобождено: {}\nЗанято: {:.1}% ({})",
+            freed_str,
+            res.after.used_percent(),
+            format_bytes(res.after.used_bytes)
+        )
+    } else {
+        format!(
+            "Freed: {}\nUsed: {:.1}% ({})",
+            freed_str,
+            res.after.used_percent(),
+            format_bytes(res.after.used_bytes)
+        )
+    };
     let _ = Command::new("notify-send")
         .arg("-a")
         .arg("Mem Reduct")
-        .arg("Память очищена")
+        .arg(title)
         .arg(body)
         .arg("-i")
         .arg("utilities-system-monitor")
@@ -256,31 +290,41 @@ fn display_clean_result(res: &CleanResult, json: bool) -> Result<(), Box<dyn std
         return Ok(());
     }
 
-    println!("\n{}", "=== Memory Clean Completed ===".green().bold());
+    let ru = is_ru();
+    let header = if ru { "=== Очистка памяти завершена ===" } else { "=== Memory Clean Completed ===" };
+    println!("\n{}", header.green().bold());
     for action in &res.actions_performed {
-        println!(" {} {}", "✔".green(), action);
+        println!(" {} {}", "✔".green(), translate_action(action));
     }
     for warning in &res.warnings {
         println!(" {} {}", "⚠".yellow(), warning);
     }
 
-    println!("\n{}", "Statistics:".bold());
+    let stats_title = if ru { "Статистика:" } else { "Statistics:" };
+    println!("\n{}", stats_title.bold());
+
+    let before_label = if ru { "Занято RAM до:   " } else { "Used RAM before: " };
+    let after_label = if ru { "Занято RAM после:" } else { "Used RAM after:  " };
     println!(
-        " Used RAM before: {} ({:.1}%)",
+        " {}{} ({:.1}%)",
+        before_label,
         format_bytes(res.before.used_bytes),
         res.before.used_percent()
     );
     println!(
-        " Used RAM after:  {} ({:.1}%)",
+        " {}{} ({:.1}%)",
+        after_label,
         format_bytes(res.after.used_bytes),
         res.after.used_percent()
     );
 
     let diff = res.freed_bytes;
     if diff >= 0 {
-        println!(" Total memory freed: {}", format_bytes(diff as u64).green().bold());
+        let freed_label = if ru { "Всего освобождено памяти:" } else { "Total memory freed:" };
+        println!(" {} {}", freed_label, format_bytes(diff as u64).green().bold());
     } else {
-        println!(" Memory change: -{}", format_bytes((-diff) as u64).yellow());
+        let change_label = if ru { "Изменение памяти:" } else { "Memory change:" };
+        println!(" {} -{}", change_label, format_bytes((-diff) as u64).yellow());
     }
     println!();
 
@@ -288,7 +332,9 @@ fn display_clean_result(res: &CleanResult, json: bool) -> Result<(), Box<dyn std
 }
 
 fn print_status(m: &MemoryMetrics) {
-    println!("\n{}", "Mem Reduct (Linux Edition)".bold().cyan());
+    let ru = is_ru();
+    let title = if ru { "Mem Reduct (Linux Версия)" } else { "Mem Reduct (Linux Edition)" };
+    println!("\n{}", title.bold().cyan());
     println!("{}", "=========================================".cyan());
 
     // RAM Bar
@@ -302,72 +348,113 @@ fn print_status(m: &MemoryMetrics) {
         format!("{:.1}%", used_pct).red().bold()
     };
 
-    println!("\n{}", "Physical Memory (RAM):".bold());
+    let ram_title = if ru { "Физическая память (ОЗУ):" } else { "Physical Memory (RAM):" };
+    println!("\n{}", ram_title.bold());
     println!(" {} {}", bar, pct_colored);
+
+    let (l_used, l_avail, l_free, l_total) = if ru {
+        ("Занято:     ", "Доступно:  ", "Свободно:   ", "Всего:     ")
+    } else {
+        ("Used:       ", "Available: ", "Free:       ", "Total:     ")
+    };
+
     println!(
-        " Used:       {:>10}  |  Available: {:>10}",
+        " {} {:>10}  |  {} {:>10}",
+        l_used,
         format_bytes(m.used_bytes).yellow(),
+        l_avail,
         format_bytes(m.available_bytes).green()
     );
     println!(
-        " Free:       {:>10}  |  Total:     {:>10}",
+        " {} {:>10}  |  {} {:>10}",
+        l_free,
         format_bytes(m.free_bytes),
+        l_total,
         format_bytes(m.total_bytes).bold()
     );
 
     // Caches & Buffers
-    println!("\n{}", "Caches & Buffers:".bold());
+    let cache_title = if ru { "Кэши и буферы:" } else { "Caches & Buffers:" };
+    println!("\n{}", cache_title.bold());
+
+    let (l_page, l_buf, l_rec, l_dirty, l_slab, l_srec) = if ru {
+        ("Кэш файлов: ", "Буферы:    ", "Очищаемый:  ", "Грязные:   ", "Кэш ядра:   ", "Очищ. Slab:")
+    } else {
+        ("Page Cache: ", "Buffers:   ", "Reclaimable:", "Dirty:     ", "Slab Total: ", "SReclaim:  ")
+    };
+
     println!(
-        " Page Cache: {:>10}  |  Buffers:   {:>10}",
+        " {} {:>10}  |  {} {:>10}",
+        l_page,
         format_bytes(m.cached_bytes),
+        l_buf,
         format_bytes(m.buffers_bytes)
     );
     println!(
-        " Reclaimable:{:>10}  |  Dirty:     {:>10}",
+        " {} {:>10}  |  {} {:>10}",
+        l_rec,
         format_bytes(m.reclaimable_cache_bytes).cyan(),
+        l_dirty,
         format_bytes(m.dirty_bytes)
     );
     println!(
-        " Slab Total: {:>10}  |  SReclaim:  {:>10}",
+        " {} {:>10}  |  {} {:>10}",
+        l_slab,
         format_bytes(m.slab_bytes),
+        l_srec,
         format_bytes(m.sreclaimable_bytes)
     );
 
     // Swap / Zram
-    println!("\n{}", "Swap Space:".bold());
+    let swap_title = if ru { "Раздел подкачки (Swap):" } else { "Swap Space:" };
+    println!("\n{}", swap_title.bold());
     if m.swap_total_bytes > 0 {
         let swap_pct = m.swap_used_percent();
+        let (l_su, l_st) = if ru { ("Swap занято: ", "Swap всего: ") } else { ("Swap Used:  ", "Swap Total: ") };
         println!(
-            " Swap Used:  {:>10} ({:.1}%) | Swap Total: {:>10}",
+            " {} {:>10} ({:.1}%) | {} {:>10}",
+            l_su,
             format_bytes(m.swap_used_bytes).yellow(),
             swap_pct,
+            l_st,
             format_bytes(m.swap_total_bytes)
         );
     } else {
-        println!(" Swap is not configured or disabled.");
+        let no_swap = if ru { " Swap не настроен или отключен." } else { " Swap is not configured or disabled." };
+        println!("{}", no_swap);
     }
 
     for z in &m.zram {
+        let (l_raw, l_compr, l_saved) = if ru {
+            ("Исходный", "Сжатый", "Сэкономлено")
+        } else {
+            ("Raw", "Compr", "Saved")
+        };
         println!(
-            " ZRAM ({}):  Raw {} -> Compr {} (Ratio: {:.2}x, Saved: {})",
+            " ZRAM ({}):  {} {} -> {} {} (Ratio: {:.2}x, {}: {})",
             z.device,
+            l_raw,
             format_bytes(z.orig_data_bytes),
+            l_compr,
             format_bytes(z.compr_data_bytes),
             z.compression_ratio(),
+            l_saved,
             format_bytes(z.space_saved_bytes()).green()
         );
     }
 
     // Pressure Stall Information (PSI)
     if let Some(psi) = &m.psi {
-        println!("\n{}", "Memory Pressure (PSI):".bold());
+        let psi_title = if ru { "Давление на память ядра (PSI):" } else { "Memory Pressure (PSI):" };
+        println!("\n{}", psi_title.bold());
+        let (l_some, l_full) = if ru { ("Задержка (Some):", "Простой (Full): ") } else { ("Some:           ", "Full:           ") };
         println!(
-            " Some: 10s={:.2}%, 60s={:.2}%, 300s={:.2}%",
-            psi.some.avg10, psi.some.avg60, psi.some.avg300
+            " {} 10s={:.2}%, 60s={:.2}%, 300s={:.2}%",
+            l_some, psi.some.avg10, psi.some.avg60, psi.some.avg300
         );
         println!(
-            " Full: 10s={:.2}%, 60s={:.2}%, 300s={:.2}%",
-            psi.full.avg10, psi.full.avg60, psi.full.avg300
+            " {} 10s={:.2}%, 60s={:.2}%, 300s={:.2}%",
+            l_full, psi.full.avg10, psi.full.avg60, psi.full.avg300
         );
     }
     println!();

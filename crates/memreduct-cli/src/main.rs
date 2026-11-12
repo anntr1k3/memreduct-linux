@@ -20,6 +20,10 @@ struct Cli {
     #[arg(long, global = true)]
     socket: Option<PathBuf>,
 
+    /// Override interface language: 'ru' or 'en'
+    #[arg(long, global = true)]
+    lang: Option<String>,
+
     /// Output in JSON format
     #[arg(long, global = true)]
     json: bool,
@@ -77,28 +81,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let socket_path = cli.socket.unwrap_or_else(resolve_socket_path);
 
+    let lang_override = cli.lang.as_deref();
+
     match cli.command.unwrap_or(Commands::Status) {
         Commands::Status => {
             let metrics = MemoryMetrics::fetch()?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&metrics)?);
             } else {
-                print_status(&metrics);
+                print_status(&metrics, lang_override);
             }
         }
         Commands::Watch { interval } => {
-            run_watch(interval).await?;
+            run_watch(interval, lang_override).await?;
         }
         Commands::Ping => {
             match send_ipc_request(&socket_path, &IpcRequest::Ping) {
                 Ok(IpcResponse::Pong) => {
-                    println!("{}", "Daemon is running and responsive (PONG).".green().bold());
+                    let msg = if is_ru(lang_override) {
+                        "Фоновый сервис активен и отвечает (PONG)."
+                    } else {
+                        "Daemon is running and responsive (PONG)."
+                    };
+                    println!("{}", msg.green().bold());
                 }
                 Ok(other) => {
                     println!("Unexpected daemon response: {:?}", other);
                 }
                 Err(e) => {
-                    println!("{}: {}", "Daemon not reachable".red().bold(), e);
+                    let msg = if is_ru(lang_override) {
+                        "Демон не доступен"
+                    } else {
+                        "Daemon not reachable"
+                    };
+                    println!("{}: {}", msg.red().bold(), e);
                     println!("Check if memreduct-daemon service is running.");
                 }
             }
@@ -113,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             notify,
         } => {
             let target = determine_target(caches, pagecache, dentries, compact, swap, all);
-            execute_clean(target, &socket_path, cli.json, notify).await?;
+            execute_clean(target, &socket_path, cli.json, notify, lang_override).await?;
         }
     }
 
@@ -151,15 +167,23 @@ async fn execute_clean(
     socket_path: &PathBuf,
     json_output: bool,
     notify: bool,
+    lang_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let ru = is_ru(lang_override);
+
     // If running as root, clean directly!
     if Cleaner::is_privileged() {
-        println!("{}", "Running with root privileges. Executing directly...".cyan());
+        let msg = if ru {
+            "Запущено с правами root. Выполняется напрямую..."
+        } else {
+            "Running with root privileges. Executing directly..."
+        };
+        println!("{}", msg.cyan());
         let res = Cleaner::clean(target)?;
         if notify {
-            send_desktop_notification(&res);
+            send_desktop_notification(&res, ru);
         }
-        display_clean_result(&res, json_output)?;
+        display_clean_result(&res, json_output, ru)?;
         return Ok(());
     }
 
@@ -167,13 +191,14 @@ async fn execute_clean(
     match send_ipc_request(socket_path, &IpcRequest::Clean(target)) {
         Ok(IpcResponse::CleanResult(res)) => {
             if notify {
-                send_desktop_notification(&res);
+                send_desktop_notification(&res, ru);
             }
-            display_clean_result(&res, json_output)?;
+            display_clean_result(&res, json_output, ru)?;
             return Ok(());
         }
         Ok(IpcResponse::Error(err)) => {
-            eprintln!("{}: {}", "Daemon returned error".red().bold(), err);
+            let prefix = if ru { "Ошибка демона" } else { "Daemon returned error" };
+            eprintln!("{}: {}", prefix.red().bold(), err);
             std::process::exit(1);
         }
         Ok(other) => {
@@ -184,10 +209,17 @@ async fn execute_clean(
             // Daemon is not running or not reachable.
             // Check if pkexec is available to elevate privileges on demand!
             if which_bin("pkexec") && which_bin("memreduct-daemon") {
+                let note = if ru { "Демон не запущен" } else { "Daemon not running" };
+                let attempt = if ru {
+                    "Попытка повышения привилегий через pkexec..."
+                } else {
+                    "Attempting elevation via pkexec..."
+                };
                 println!(
-                    "{} (Socket: {:?}). Attempting elevation via pkexec...",
-                    "Daemon not running".yellow(),
-                    socket_path
+                    "{} (Socket: {:?}). {}",
+                    note.yellow(),
+                    socket_path,
+                    attempt
                 );
 
                 let target_arg = match target {
@@ -210,24 +242,58 @@ async fn execute_clean(
 
                 let status = cmd.status()?;
                 if !status.success() {
-                    eprintln!("{}", "Elevation cancelled or failed.".red());
+                    let cancel_msg = if ru { "Повышение прав отменено или завершилось ошибкой." } else { "Elevation cancelled or failed." };
+                    eprintln!("{}", cancel_msg.red());
                     std::process::exit(status.code().unwrap_or(1));
                 }
                 return Ok(());
             }
 
-            eprintln!("{}: {}", "Cannot clean memory as non-root user".red().bold(), ipc_err);
-            eprintln!("\nOptions to enable memory cleaning:");
-            eprintln!(" 1. Start memreduct-daemon as root:");
-            eprintln!("    {} sudo memreduct-daemon", "$".cyan());
-            eprintln!(" 2. Or run CLI with sudo:");
-            eprintln!("    {} sudo memreduct clean --all", "$".cyan());
+            let err_title = if ru { "Невозможно очистить память без root-прав" } else { "Cannot clean memory as non-root user" };
+            eprintln!("{}: {}", err_title.red().bold(), ipc_err);
+            if ru {
+                eprintln!("\nВарианты очистки памяти:");
+                eprintln!(" 1. Запустить memreduct-daemon через systemd:");
+                eprintln!("    {} sudo systemctl start memreduct", "$".cyan());
+                eprintln!(" 2. Или запустить с sudo:");
+                eprintln!("    {} sudo memreduct clean --all", "$".cyan());
+            } else {
+                eprintln!("\nOptions to enable memory cleaning:");
+                eprintln!(" 1. Start memreduct-daemon as systemd service:");
+                eprintln!("    {} sudo systemctl start memreduct", "$".cyan());
+                eprintln!(" 2. Or run CLI with sudo:");
+                eprintln!("    {} sudo memreduct clean --all", "$".cyan());
+            }
             std::process::exit(1);
         }
     }
 }
 
-fn is_ru() -> bool {
+fn is_ru(lang_override: Option<&str>) -> bool {
+    if let Some(l) = lang_override {
+        match l.to_lowercase().as_str() {
+            "ru" | "rus" | "russian" => return true,
+            "en" | "eng" | "english" => return false,
+            _ => {}
+        }
+    }
+
+    // Try reading tray configuration if present
+    if let Ok(home) = std::env::var("HOME") {
+        let config_path = PathBuf::from(home).join(".config/memreduct/tray_config.json");
+        if let Ok(data) = std::fs::read_to_string(config_path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(lang) = val.get("language").and_then(|v| v.as_str()) {
+                    match lang.to_lowercase().as_str() {
+                        "ru" => return true,
+                        "en" => return false,
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     std::env::var("LANG")
         .or_else(|_| std::env::var("LC_ALL"))
         .or_else(|_| std::env::var("LC_MESSAGES"))
@@ -235,8 +301,8 @@ fn is_ru() -> bool {
         .unwrap_or(false)
 }
 
-fn translate_action(act: &str) -> String {
-    if !is_ru() {
+fn translate_action(act: &str, ru: bool) -> String {
+    if !ru {
         return act.to_string();
     }
     match act {
@@ -250,14 +316,13 @@ fn translate_action(act: &str) -> String {
     }
 }
 
-fn send_desktop_notification(res: &CleanResult) {
+fn send_desktop_notification(res: &CleanResult, ru: bool) {
     let freed = res.freed_bytes;
     let freed_str = if freed >= 0 {
         format_bytes(freed as u64)
     } else {
         format!("-{}", format_bytes((-freed) as u64))
     };
-    let ru = is_ru();
     let title = if ru { "Mem Reduct: Память очищена" } else { "Mem Reduct: Memory Cleaned" };
     let body = if ru {
         format!(
@@ -284,17 +349,16 @@ fn send_desktop_notification(res: &CleanResult) {
         .spawn();
 }
 
-fn display_clean_result(res: &CleanResult, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn display_clean_result(res: &CleanResult, json: bool, ru: bool) -> Result<(), Box<dyn std::error::Error>> {
     if json {
         println!("{}", serde_json::to_string_pretty(res)?);
         return Ok(());
     }
 
-    let ru = is_ru();
     let header = if ru { "=== Очистка памяти завершена ===" } else { "=== Memory Clean Completed ===" };
     println!("\n{}", header.green().bold());
     for action in &res.actions_performed {
-        println!(" {} {}", "✔".green(), translate_action(action));
+        println!(" {} {}", "✔".green(), translate_action(action, ru));
     }
     for warning in &res.warnings {
         println!(" {} {}", "⚠".yellow(), warning);
@@ -331,8 +395,8 @@ fn display_clean_result(res: &CleanResult, json: bool) -> Result<(), Box<dyn std
     Ok(())
 }
 
-fn print_status(m: &MemoryMetrics) {
-    let ru = is_ru();
+fn print_status(m: &MemoryMetrics, lang_override: Option<&str>) {
+    let ru = is_ru(lang_override);
     let title = if ru { "Mem Reduct (Linux Версия)" } else { "Mem Reduct (Linux Edition)" };
     println!("\n{}", title.bold().cyan());
     println!("{}", "=========================================".cyan());
@@ -480,20 +544,27 @@ fn render_bar(percentage: f64) -> String {
     format!("[{}{}]", colored_fill, empty_str)
 }
 
-async fn run_watch(interval_secs: f64) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_watch(interval_secs: f64, lang_override: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
     let dur = Duration::from_secs_f64(interval_secs.max(0.2));
+    let ru = is_ru(lang_override);
 
     loop {
         // Clear terminal screen
         print!("\x1B[2J\x1B[1;1H");
         let metrics = MemoryMetrics::fetch()?;
-        print_status(&metrics);
-        println!("{}", format!("(Refreshing every {:.1}s. Press Ctrl+C to exit)", interval_secs).dimmed());
+        print_status(&metrics, lang_override);
+        let note = if ru {
+            format!("(Обновление каждые {:.1}с. Нажмите Ctrl+C для выхода)", interval_secs)
+        } else {
+            format!("(Refreshing every {:.1}s. Press Ctrl+C to exit)", interval_secs)
+        };
+        println!("{}", note.dimmed());
 
         tokio::select! {
             _ = sleep(dur) => {},
             _ = tokio::signal::ctrl_c() => {
-                println!("\nExiting monitor.");
+                let exit_msg = if ru { "Выход из мониторинга." } else { "Exiting monitor." };
+                println!("\n{}", exit_msg);
                 break;
             }
         }

@@ -39,6 +39,10 @@ const DIGITS: [u16; 10] = [
     0b111_101_111_001_111, // 9
 ];
 
+fn default_language() -> String {
+    "auto".into()
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TrayConfig {
     pub threshold_enabled: bool,
@@ -46,6 +50,8 @@ pub struct TrayConfig {
     pub timer_enabled: bool,
     pub timer_minutes: u64,
     pub notify_on_clean: bool,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 impl Default for TrayConfig {
@@ -56,6 +62,7 @@ impl Default for TrayConfig {
             timer_enabled: false,
             timer_minutes: 30,
             notify_on_clean: true,
+            language: default_language(),
         }
     }
 }
@@ -84,6 +91,27 @@ impl TrayConfig {
         if let Ok(json) = serde_json::to_string_pretty(self) {
             let _ = fs::write(path, json);
         }
+    }
+
+    pub fn is_russian(&self) -> bool {
+        match self.language.to_lowercase().as_str() {
+            "ru" => true,
+            "en" => false,
+            _ => {
+                std::env::var("LANG")
+                    .or_else(|_| std::env::var("LC_ALL"))
+                    .map(|l| l.to_lowercase().starts_with("ru"))
+                    .unwrap_or(false)
+            }
+        }
+    }
+}
+
+fn tr<'a>(is_ru: bool, ru_text: &'a str, en_text: &'a str) -> &'a str {
+    if is_ru {
+        ru_text
+    } else {
+        en_text
     }
 }
 
@@ -157,13 +185,27 @@ impl MemReductTray {
 
             let cfg = { self.config.lock().unwrap().clone() };
             if cfg.notify_on_clean {
-                let prefix = if is_auto { "Автоочистка памяти" } else { "Очистка памяти" };
-                let body = format!(
-                    "Освобождено: {}\nЗанято: {:.1}% ({})",
-                    freed_str,
-                    clean_res.after.used_percent(),
-                    format_bytes(clean_res.after.used_bytes)
-                );
+                let is_ru = cfg.is_russian();
+                let prefix = if is_auto {
+                    tr(is_ru, "Автоочистка памяти", "Autoclean Memory")
+                } else {
+                    tr(is_ru, "Очистка памяти", "Memory Clean")
+                };
+                let body = if is_ru {
+                    format!(
+                        "Освобождено: {}\nЗанято: {:.1}% ({})",
+                        freed_str,
+                        clean_res.after.used_percent(),
+                        format_bytes(clean_res.after.used_bytes)
+                    )
+                } else {
+                    format!(
+                        "Freed: {}\nUsed: {:.1}% ({})",
+                        freed_str,
+                        clean_res.after.used_percent(),
+                        format_bytes(clean_res.after.used_bytes)
+                    )
+                };
                 send_desktop_notification(prefix, &body);
             }
         }
@@ -290,15 +332,20 @@ impl Tray for MemReductTray {
     }
 
     fn tool_tip(&self) -> ToolTip {
+        let is_ru = self.config.lock().unwrap().is_russian();
         if let Some(m) = &self.metrics {
             ToolTip {
-                title: format!("Mem Reduct: {:.1}% Занято", m.used_percent()),
+                title: format!("Mem Reduct: {:.1}% {}", m.used_percent(), tr(is_ru, "Занято", "Used")),
                 description: format!(
-                    "Занято: {} / {}\nДоступно: {}\nКэши: {}\nSwap: {}",
+                    "{}: {} / {}\n{}: {}\n{}: {}\n{}: {}",
+                    tr(is_ru, "Занято", "Used"),
                     format_bytes(m.used_bytes),
                     format_bytes(m.total_bytes),
+                    tr(is_ru, "Доступно", "Available"),
                     format_bytes(m.available_bytes),
+                    tr(is_ru, "Кэши", "Caches"),
                     format_bytes(m.reclaimable_cache_bytes),
+                    tr(is_ru, "Swap", "Swap"),
                     format_bytes(m.swap_used_bytes),
                 ),
                 icon_name: "utilities-system-monitor".into(),
@@ -307,7 +354,7 @@ impl Tray for MemReductTray {
         } else {
             ToolTip {
                 title: "Mem Reduct (Linux)".into(),
-                description: "Мониторинг оперативной памяти...".into(),
+                description: tr(is_ru, "Мониторинг оперативной памяти...", "Monitoring system memory...").into(),
                 icon_name: "utilities-system-monitor".into(),
                 icon_pixmap: Vec::new(),
             }
@@ -316,10 +363,13 @@ impl Tray for MemReductTray {
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
         let mut items: Vec<MenuItem<Self>> = Vec::new();
+        let cfg = { self.config.lock().unwrap().clone() };
+        let is_ru = cfg.is_russian();
 
         if let Some(m) = &self.metrics {
             let header = format!(
-                "ОЗУ: {:.1}% ({} / {})",
+                "{}: {:.1}% ({} / {})",
+                tr(is_ru, "ОЗУ", "RAM"),
                 m.used_percent(),
                 format_bytes(m.used_bytes),
                 format_bytes(m.total_bytes)
@@ -335,7 +385,7 @@ impl Tray for MemReductTray {
 
             items.push(
                 StandardItem {
-                    label: format!("Доступно: {}", format_bytes(m.available_bytes)),
+                    label: format!("{}: {}", tr(is_ru, "Доступно", "Available"), format_bytes(m.available_bytes)),
                     enabled: false,
                     ..Default::default()
                 }
@@ -344,7 +394,7 @@ impl Tray for MemReductTray {
 
             items.push(
                 StandardItem {
-                    label: format!("Кэши: {}", format_bytes(m.reclaimable_cache_bytes)),
+                    label: format!("{}: {}", tr(is_ru, "Кэши", "Caches"), format_bytes(m.reclaimable_cache_bytes)),
                     enabled: false,
                     ..Default::default()
                 }
@@ -355,7 +405,8 @@ impl Tray for MemReductTray {
                 items.push(
                     StandardItem {
                         label: format!(
-                            "Swap: {} / {}",
+                            "{}: {} / {}",
+                            tr(is_ru, "Swap", "Swap"),
                             format_bytes(m.swap_used_bytes),
                             format_bytes(m.swap_total_bytes)
                         ),
@@ -371,7 +422,7 @@ impl Tray for MemReductTray {
             items.push(MenuItem::Separator);
             items.push(
                 StandardItem {
-                    label: format!("Очистка: {}", msg),
+                    label: format!("{}: {}", tr(is_ru, "Очистка", "Clean"), msg),
                     enabled: false,
                     ..Default::default()
                 }
@@ -384,7 +435,7 @@ impl Tray for MemReductTray {
         // Actions
         items.push(
             StandardItem {
-                label: "⚡ Очистить все кэши".into(),
+                label: tr(is_ru, "⚡ Очистить все кэши", "⚡ Clean All Caches").into(),
                 icon_name: "edit-clear".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::AllCaches, false);
@@ -396,7 +447,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🧹 Полная очистка (Кэш + Сжатие + Swap)".into(),
+                label: tr(is_ru, "🧹 Полная очистка (Кэш + Сжатие + Swap)", "🧹 Full Clean (Caches + Compact + Swap)").into(),
                 icon_name: "edit-clear-all".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::All, false);
@@ -408,7 +459,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🗜 Дефрагментация памяти (HugePages)".into(),
+                label: tr(is_ru, "🗜 Дефрагментация памяти (HugePages)", "🗜 Compact Memory (HugePages)").into(),
                 icon_name: "system-run".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::CompactMemory, false);
@@ -420,7 +471,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "🔄 Безопасный сброс Swap".into(),
+                label: tr(is_ru, "🔄 Безопасный сброс Swap", "🔄 Safe Swap Reset").into(),
                 icon_name: "view-refresh".into(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.trigger_clean(CleanTarget::Swap, false);
@@ -433,33 +484,107 @@ impl Tray for MemReductTray {
         items.push(MenuItem::Separator);
 
         // Autoclean Submenu
-        let cfg = { self.config.lock().unwrap().clone() };
-
         let threshold_label = if cfg.threshold_enabled {
-            format!("✔ Очистка при RAM > {}% (Вкл)", cfg.threshold_pct as u32)
+            tr(
+                is_ru,
+                &format!("✔ Очистка при RAM > {}% (Вкл)", cfg.threshold_pct as u32),
+                &format!("✔ Clean when RAM > {}% (On)", cfg.threshold_pct as u32),
+            )
+            .to_string()
         } else {
-            format!("  Очистка при RAM > {}% (Выкл)", cfg.threshold_pct as u32)
+            tr(
+                is_ru,
+                &format!("  Очистка при RAM > {}% (Выкл)", cfg.threshold_pct as u32),
+                &format!("  Clean when RAM > {}% (Off)", cfg.threshold_pct as u32),
+            )
+            .to_string()
         };
 
         let timer_label = if cfg.timer_enabled {
-            format!("✔ Очистка каждые {} мин (Вкл)", cfg.timer_minutes)
+            tr(
+                is_ru,
+                &format!("✔ Очистка каждые {} мин (Вкл)", cfg.timer_minutes),
+                &format!("✔ Clean every {} mins (On)", cfg.timer_minutes),
+            )
+            .to_string()
         } else {
-            format!("  Очистка каждые {} мин (Выкл)", cfg.timer_minutes)
+            tr(
+                is_ru,
+                &format!("  Очистка каждые {} мин (Выкл)", cfg.timer_minutes),
+                &format!("  Clean every {} mins (Off)", cfg.timer_minutes),
+            )
+            .to_string()
         };
 
         let notify_label = if cfg.notify_on_clean {
-            "✔ Всплывающие уведомления (Вкл)".to_string()
+            tr(is_ru, "✔ Всплывающие уведомления (Вкл)", "✔ Desktop Notifications (On)").to_string()
         } else {
-            "  Всплывающие уведомления (Выкл)".to_string()
+            tr(is_ru, "  Всплывающие уведомления (Выкл)", "  Desktop Notifications (Off)").to_string()
         };
 
         let cfg_clone1 = self.config.clone();
         let cfg_clone2 = self.config.clone();
         let cfg_clone3 = self.config.clone();
+        let cfg_lang_ru = self.config.clone();
+        let cfg_lang_en = self.config.clone();
+        let cfg_lang_auto = self.config.clone();
+
+        let cur_lang = cfg.language.to_lowercase();
+        let is_lang_ru = cur_lang == "ru";
+        let is_lang_en = cur_lang == "en";
+        let is_lang_auto = cur_lang == "auto" || (!is_lang_ru && !is_lang_en);
+
+        let lang_menu = SubMenu {
+            label: tr(is_ru, "🌐 Язык интерфейса", "🌐 Language").into(),
+            submenu: vec![
+                StandardItem {
+                    label: format!("{} Русский", if is_lang_ru { "✔" } else { " " }),
+                    activate: Box::new(move |_| {
+                        let mut c = cfg_lang_ru.lock().unwrap();
+                        c.language = "ru".into();
+                        c.save();
+                        send_desktop_notification("Mem Reduct", "Язык интерфейса изменен на Русский");
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+                StandardItem {
+                    label: format!("{} English", if is_lang_en { "✔" } else { " " }),
+                    activate: Box::new(move |_| {
+                        let mut c = cfg_lang_en.lock().unwrap();
+                        c.language = "en".into();
+                        c.save();
+                        send_desktop_notification("Mem Reduct", "Interface language changed to English");
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+                StandardItem {
+                    label: format!(
+                        "{} {}",
+                        if is_lang_auto { "✔" } else { " " },
+                        tr(is_ru, "Авто (как в системе)", "Auto (System)")
+                    ),
+                    activate: Box::new(move |_| {
+                        let mut c = cfg_lang_auto.lock().unwrap();
+                        c.language = "auto".into();
+                        c.save();
+                        let ru_now = c.is_russian();
+                        send_desktop_notification(
+                            "Mem Reduct",
+                            tr(ru_now, "Язык интерфейса: Авто (как в системе)", "Interface language: Auto (System)"),
+                        );
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            ],
+            ..Default::default()
+        };
 
         items.push(
             SubMenu {
-                label: "⚙ Настройки автоочистки".into(),
+                label: tr(is_ru, "⚙ Настройки", "⚙ Settings").into(),
                 submenu: vec![
                     StandardItem {
                         label: threshold_label,
@@ -491,6 +616,8 @@ impl Tray for MemReductTray {
                         ..Default::default()
                     }
                     .into(),
+                    MenuItem::Separator,
+                    lang_menu.into(),
                 ],
                 ..Default::default()
             }
@@ -501,7 +628,7 @@ impl Tray for MemReductTray {
 
         items.push(
             StandardItem {
-                label: "Выход из Mem Reduct".into(),
+                label: tr(is_ru, "Выход из Mem Reduct", "Quit Mem Reduct").into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(|_| {
                     info!("Quit requested from tray menu. Exiting.");

@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "memreduct-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "colored",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "memreduct-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "libc",
  "nix",
@@ -496,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "memreduct-daemon"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "memreduct-core",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "memreduct-tray"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "ksni",

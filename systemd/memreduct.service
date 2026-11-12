@@ -1,11 +1,11 @@
 [Unit]
 Description=Mem Reduct Privileged Memory Daemon
-Documentation=https://github.com/kami/memreduct-linux
+Documentation=https://github.com/anntr1k3/memreduct-linux
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/memreduct-daemon
+ExecStart=/usr/bin/memreduct-daemon
 Restart=on-failure
 RestartSec=3s
 

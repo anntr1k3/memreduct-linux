@@ -4,13 +4,19 @@
   <b>English</b> | <a href="README.ru.md">🇷🇺 Читать на русском</a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/anntr1k3/memreduct-linux/releases"><img src="https://img.shields.io/github/v/release/anntr1k3/memreduct-linux?color=green" alt="Latest Release" /></a>
+  <img src="https://img.shields.io/badge/Language-Rust_2024-orange.svg" alt="Rust 2024" />
+  <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="GPL-3.0 License" />
+</p>
+
 A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% Rust** inspired by [henrypp/memreduct](https://github.com/henrypp/memreduct).
 
 <p align="center">
   <img src="assets/screenshot.png" alt="Mem Reduct Linux Tray Menu" width="380" />
 </p>
 
-Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11, KDE) with a secure **Client-Server architecture**.
+Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11, KDE) with a secure **Client-Server architecture** and native **Russian / English bilingual support**.
 
 ---
 
@@ -34,63 +40,75 @@ Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11
 * **Native System Tray Indicator**:
   * Works out-of-the-box on Ubuntu GNOME (Wayland) and KDE via StatusNotifierItem (AppIndicator).
   * Real-time dynamic tray icon displaying current memory usage percentage and a color-coded gauge (Green < 60%, Yellow 60-85%, Red > 85%).
-  * Right-click menu with memory stats, instant cleaning actions, and configurable autoclean threshold.
+  * Right-click menu with memory stats, instant cleaning actions, configurable autoclean threshold, timer, and **runtime language switcher (Русский / English)**.
 * **Rich Terminal CLI**:
   * Beautiful colorized status view (`memreduct status`).
   * Live monitoring mode (`memreduct watch`).
   * Full JSON output support (`--json`) for scripting.
+  * Language override flag (`--lang ru` / `--lang en`).
 
 ---
 
-## 📦 Project Structure
+## 📦 Installation
 
-```text
-memreduct-linux/
-├── crates/
-│   ├── memreduct-core/     # Reusable engine: /proc parsing, PSI, ZRAM, Cleaner logic & IPC
-│   ├── memreduct-daemon/   # Privileged background service and Polkit helper
-│   ├── memreduct-cli/      # Terminal tool (status, watch, clean, ping)
-│   └── memreduct-tray/     # Wayland/GNOME System Tray app with dynamic percentage badge
-├── systemd/
-│   └── memreduct.service   # Hardened systemd service definition
-├── polkit/
-│   └── org.memreduct.policy# Polkit elevation action definition
-└── scripts/
-    ├── install.sh          # One-click build & install script
-    └── uninstall.sh        # Complete uninstaller script
+Choose the installation method that fits your distribution:
+
+### Method 1: Ubuntu / Debian / Linux Mint (.deb package) — *Recommended*
+
+Download and install the prebuilt `.deb` package with one command (no Rust or compilation required):
+
+```bash
+wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct_1.0.0_amd64.deb
+sudo apt install ./memreduct_1.0.0_amd64.deb
 ```
 
----
+*This automatically installs the binaries, creates the desktop launcher, registers the systemd daemon, installs Polkit elevation policies, and configures tray autostart.*
 
-## 🛠 Building & Installation
+### Method 2: Generic Linux (Arch, Fedora, openSUSE, etc.)
 
-### Requirements
-* Linux with kernel 4.x+ (kernel 5.x+ recommended for PSI support)
-* Rust toolchain (1.75+ or nightly)
+Download the pre-compiled standalone tarball:
 
-### Quick Install
 ```bash
-# Clone or navigate to the project directory
-cd ~/.gemini/antigravity/scratch/memreduct-linux
+wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct-v1.0.0-linux-x86_64.tar.gz
+tar -xzf memreduct-v1.0.0-linux-x86_64.tar.gz
+cd memreduct-v1.0.0-linux-x86_64
+sudo ./install.sh
+```
 
-# Run installation script (builds release binaries and registers services)
+### Method 3: Build from Source via Cargo
+
+```bash
+git clone https://github.com/anntr1k3/memreduct-linux.git
+cd memreduct-linux
 ./scripts/install.sh
 ```
 
-### Starting the Daemon
-```bash
-# Start and enable the privileged service
-sudo systemctl enable --now memreduct
+---
 
-# Check daemon status
-memreduct ping
-```
+## 🖥 Usage
 
-### Running the Tray Indicator
+### Starting the Tray Indicator
+After installation, you can launch **Mem Reduct** directly from your desktop Application Menu (Super / Windows key $\rightarrow$ search `Mem Reduct`), or run:
+
 ```bash
-# Launch the tray app in your desktop session
 memreduct-tray &
 ```
+
+### Language Selection
+Right-click on the tray icon $\rightarrow$ **`⚙ Settings`** $\rightarrow$ **`🌐 Language`** $\rightarrow$ Choose **`Русский`**, **`English`**, or **`Auto (System)`**.
+
+---
+
+## ⌨️ Global Hotkey Setup (GNOME / Wayland)
+
+To clean memory with a shortcut (e.g., `Ctrl+F1` or `Ctrl+Alt+M`):
+1. Open GNOME **Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **View and Customize Shortcuts** $\rightarrow$ **Custom Shortcuts**.
+2. Click **+** (Add Shortcut):
+   * **Name**: `Mem Reduct Clean`
+   * **Command**: `memreduct clean --all --notify`
+   * **Shortcut**: `Ctrl+F1` (or your preferred shortcut)
+
+Now pressing your shortcut instantly frees memory and displays a desktop notification with the freed amount!
 
 ---
 

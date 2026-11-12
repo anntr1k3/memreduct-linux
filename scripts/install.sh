@@ -6,17 +6,24 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "=== Mem Reduct Linux - Build & Installation ==="
 
-# Build release binaries
-echo "[1/5] Building release binaries via Cargo..."
-export PATH="$HOME/.cargo/bin:$PATH"
-cd "$ROOT_DIR"
-cargo build --release
+# Build release binaries if needed
+if [ ! -f "$ROOT_DIR/target/release/memreduct" ] || [ ! -f "$ROOT_DIR/target/release/memreduct-daemon" ] || [ ! -f "$ROOT_DIR/target/release/memreduct-tray" ]; then
+    echo "[1/5] Building release binaries via Cargo..."
+    export PATH="$HOME/.cargo/bin:$PATH"
+    cd "$ROOT_DIR"
+    cargo build --release
+else
+    echo "[1/5] Using existing release binaries (skip build)..."
+fi
 
 # Install binaries to /usr/local/bin
 echo "[2/5] Installing binaries to /usr/local/bin..."
 sudo install -m 755 "$ROOT_DIR/target/release/memreduct" /usr/local/bin/memreduct
 sudo install -m 755 "$ROOT_DIR/target/release/memreduct-daemon" /usr/local/bin/memreduct-daemon
 sudo install -m 755 "$ROOT_DIR/target/release/memreduct-tray" /usr/local/bin/memreduct-tray
+sudo ln -sf /usr/local/bin/memreduct-daemon /usr/bin/memreduct-daemon
+sudo ln -sf /usr/local/bin/memreduct /usr/bin/memreduct
+sudo ln -sf /usr/local/bin/memreduct-tray /usr/bin/memreduct-tray
 
 # Install systemd service
 echo "[3/5] Installing systemd service..."

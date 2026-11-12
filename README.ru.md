@@ -5,12 +5,18 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/anntr1k3/memreduct-linux/releases"><img src="https://img.shields.io/github/v/release/anntr1k3/memreduct-linux?color=green" alt="Последний релиз" /></a>
+  <img src="https://img.shields.io/badge/Язык-Rust_2024-orange.svg" alt="Rust 2024" />
+  <img src="https://img.shields.io/badge/Лицензия-GPL--3.0-blue.svg" alt="Лицензия GPL-3.0" />
+</p>
+
+<p align="center">
   <img src="assets/screenshot.png" alt="Mem Reduct Linux Tray Menu" width="380" />
 </p>
 
 Высокопроизводительный легковесный системный монитор и инструмент очистки оперативной памяти для Linux, написанный на **100% Rust** по мотивам классической утилиты [henrypp/memreduct](https://github.com/henrypp/memreduct).
 
-Специально спроектирован для современных графических окружений Linux (GNOME, Wayland, X11, KDE) с безопасной **клиент-серверной архитектурой**.
+Специально спроектирован для современных графических окружений Linux (GNOME, Wayland, X11, KDE) с безопасной **клиент-серверной архитектурой** и встроенным переключением между **русским и английским языками**.
 
 ---
 
@@ -68,30 +74,54 @@ memreduct-linux/
 
 ---
 
-## 🛠 Сборка и установка
+## 📦 Установка
 
-### Требования
-* Ядро Linux 4.x+ (ядро 5.x+ для поддержки PSI).
-* Rust и Cargo (1.75+ или nightly).
+Выберите наиболее удобный вариант для вашей системы:
 
-### Быстрая установка в систему
+### Вариант 1: Ubuntu / Debian / Linux Mint (.deb пакет) — *Рекомендуется*
+
+Готовый установочный пакет (не требует компиляции и наличия Rust):
+
 ```bash
-cd ~/.gemini/antigravity/scratch/memreduct-linux
+wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct_1.0.0_amd64.deb
+sudo apt install ./memreduct_1.0.0_amd64.deb
+```
+
+*Пакет автоматически установит бинарники, ярлык в меню приложений, фоновую службу systemd, правила Polkit и автозапуск трея.*
+
+### Вариант 2: Любой другой дистрибутив Linux (Arch, Fedora, openSUSE и др.)
+
+Готовый автономный архив с автоматическим установщиком:
+
+```bash
+wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct-v1.0.0-linux-x86_64.tar.gz
+tar -xzf memreduct-v1.0.0-linux-x86_64.tar.gz
+cd memreduct-v1.0.0-linux-x86_64
+sudo ./install.sh
+```
+
+### Вариант 3: Сборка из исходников через Cargo
+
+```bash
+git clone https://github.com/anntr1k3/memreduct-linux.git
+cd memreduct-linux
 ./scripts/install.sh
 ```
 
-Скрипт соберёт оптимизированные `release`-бинарники, скопирует их в `/usr/local/bin`, установит иконку, зарегистрирует десктоп-ярлык и службу `systemd`.
+---
 
-### Запуск службы и трея
+## 🖥 Использование
+
+### Запуск и закрепление в доке
+После установки вы можете запускать **Mem Reduct** прямо из списка приложений (клавиша **Super** / **Windows** $\rightarrow$ найдите `Mem Reduct`), откуда ярлык можно закрепить в избранное / Dock.
+
+Также можно запустить из терминала:
 ```bash
-# Включить и запустить системную службу
-sudo systemctl enable --now memreduct
-
-# Запустить индикатор в трее
 memreduct-tray &
 ```
 
-После этого приложение появится в меню приложений (по клавише **Super** / **Windows**) под именем **Mem Reduct**, откуда его можно закрепить в док.
+### Выбор языка
+Правый клик по иконке в трее $\rightarrow$ **`⚙ Настройки`** $\rightarrow$ **`🌐 Язык интерфейса`** $\rightarrow$ выберите **`Русский`**, **`English`** или **`Авто (как в системе)`**.
 
 ---
 

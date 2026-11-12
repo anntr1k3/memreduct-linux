@@ -1,4 +1,7 @@
 /target
+/dist/
+*.deb
+*.tar.gz
 Cargo.lock
 **/*.rs.bk
 *.sock

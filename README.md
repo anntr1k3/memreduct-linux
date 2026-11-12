@@ -7,30 +7,29 @@
 <p align="center">
   <a href="https://github.com/anntr1k3/memreduct-linux/releases"><img src="https://img.shields.io/github/v/release/anntr1k3/memreduct-linux?color=green" alt="Latest Release" /></a>
   <img src="https://img.shields.io/badge/Language-Rust_2024-orange.svg" alt="Rust 2024" />
+  <img src="https://img.shields.io/badge/Platform-Linux%20(x86__64)-informational.svg" alt="Platform" />
   <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="GPL-3.0 License" />
 </p>
 
-A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% Rust** inspired by [henrypp/memreduct](https://github.com/henrypp/memreduct).
+A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% pure Rust** inspired by the classic [henrypp/memreduct](https://github.com/henrypp/memreduct).
 
 <p align="center">
   <img src="assets/screenshot.png" alt="Mem Reduct Linux Tray Menu" width="380" />
 </p>
 
-Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11, KDE) with a secure **Client-Server architecture** and native **Russian / English bilingual support**.
+Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11, KDE Plasma) with a secure **Client-Server architecture** and native **Russian / English bilingual support**.
 
 ---
 
 ## 🚀 Key Features
 
 * **Real-time Memory Monitoring**:
-  * Accurate **Used vs Available RAM** based on modern Linux kernel heuristics (`MemAvailable` from `/proc/meminfo`).
+  * Accurate **Used vs Available RAM** calculated using modern Linux kernel heuristics (`MemAvailable` from `/proc/meminfo`).
   * Granular breakdown of **Page Cache**, **Buffers**, **Reclaimable Slab** (dentries & inodes), and **Dirty Pages**.
   * **Swap & ZRAM** compression metrics (ratio, raw vs compressed size, space saved).
   * **PSI (Pressure Stall Information)** monitoring (`/proc/pressure/memory`) to detect system memory thrashing before OOM killer strikes.
 * **Smart & Safe Memory Cleaning**:
-  * `PageCache` flushing (`echo 1 > /proc/sys/vm/drop_caches`).
-  * `Dentries & Inodes` reclamation (`echo 2 > /proc/sys/vm/drop_caches`).
-  * Combined Cache drop with mandatory `sync()` pre-flush.
+  * Safe cache drops with mandatory `libc::sync()` pre-flush to ensure dirty pages are committed to disk before eviction.
   * **Memory Compaction** (`echo 1 > /proc/sys/vm/compact_memory`) for defragmenting physical memory and HugePages.
   * **Safe Swap Reset** (`swapoff -a && swapon -a`) protected by strict RAM headroom checks (`Available > SwapUsed * 1.2`) to prevent OOM panics.
 * **Client-Server Security Architecture**:
@@ -38,14 +37,31 @@ Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11
   * Privileged operations are handled by a lightweight background daemon or on-demand via Polkit (`pkexec`).
   * Communication over local UNIX domain sockets (`/run/memreduct/memreduct.sock`).
 * **Native System Tray Indicator**:
-  * Works out-of-the-box on Ubuntu GNOME (Wayland) and KDE via StatusNotifierItem (AppIndicator).
+  * Works out-of-the-box on Ubuntu GNOME (Wayland) and KDE Plasma via StatusNotifierItem (AppIndicator).
   * Real-time dynamic tray icon displaying current memory usage percentage and a color-coded gauge (Green < 60%, Yellow 60-85%, Red > 85%).
-  * Right-click menu with memory stats, instant cleaning actions, configurable autoclean threshold, timer, and **runtime language switcher (Русский / English)**.
+  * Right-click menu with live memory stats, instant cleaning actions, configurable autoclean threshold, timer, and **runtime language switcher (Русский / English)**.
+* **Automation & Notifications**:
+  * Automatic cleaning when RAM exceeds threshold (e.g., > 80%).
+  * Periodic cleaning by timer (e.g., every 30 minutes).
+  * Native desktop notifications reporting exact memory freed.
+* **Global Hotkey Support**:
+  * Clean memory instantly via customizable shortcut (e.g., `Ctrl+F1` or `Ctrl+Alt+M`).
 * **Rich Terminal CLI**:
   * Beautiful colorized status view (`memreduct status`).
-  * Live monitoring mode (`memreduct watch`).
+  * Interactive live monitor (`memreduct watch`).
   * Full JSON output support (`--json`) for scripting.
   * Language override flag (`--lang ru` / `--lang en`).
+
+---
+
+## 🧹 Memory Cleaning Actions
+
+| Action | Kernel Mechanism | Description |
+|---|---|---|
+| **Clean All Caches** | `libc::sync()` + `echo 3 > /proc/sys/vm/drop_caches` | Drops PageCache, directory entries (dentries), and inode caches. |
+| **Compact Memory** | `echo 1 > /proc/sys/vm/compact_memory` | Defragments physical RAM pages into contiguous blocks (HugePages). |
+| **Safe Swap Reset** | `swapoff -a && swapon -a` | Flushes swap back into RAM. Aborts safely if RAM headroom is $< 120\%$. |
+| **Full Clean** | All actions in safe sequence | Complete memory optimization: caches flushed, memory compacted, and swap safely refreshed. |
 
 ---
 
@@ -53,9 +69,9 @@ Designed specifically for modern Linux desktop environments (GNOME, Wayland, X11
 
 Choose the installation method that fits your distribution:
 
-### Method 1: Ubuntu / Debian / Linux Mint (.deb package) — *Recommended*
+### Method 1: Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb` package) — *Recommended*
 
-Download and install the prebuilt `.deb` package with one command (no Rust or compilation required):
+Download and install the pre-built `.deb` package with one command (no Rust or compilation required):
 
 ```bash
 wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct_1.0.0_amd64.deb
@@ -66,7 +82,7 @@ sudo apt install ./memreduct_1.0.0_amd64.deb
 
 ### Method 2: Generic Linux (Arch, Fedora, openSUSE, etc.)
 
-Download the pre-compiled standalone tarball:
+Download the standalone pre-compiled archive with an automated installer:
 
 ```bash
 wget https://github.com/anntr1k3/memreduct-linux/releases/download/v1.0.0/memreduct-v1.0.0-linux-x86_64.tar.gz
@@ -83,12 +99,17 @@ cd memreduct-linux
 ./scripts/install.sh
 ```
 
+> [!NOTE]
+> **Desktop Environment Compatibility**:
+> * **Ubuntu GNOME / KDE Plasma / XFCE / Cinnamon / MATE**: Works immediately out of the box.
+> * **Arch / Fedora (Vanilla GNOME)**: Ensure the [AppIndicator and KStatusNotifierItem Support](https://extensions.gnome.org/extension/615/appindicator-support/) GNOME extension is enabled.
+
 ---
 
 ## 🖥 Usage
 
 ### Starting the Tray Indicator
-After installation, you can launch **Mem Reduct** directly from your desktop Application Menu (Super / Windows key $\rightarrow$ search `Mem Reduct`), or run:
+After installation, Mem Reduct is configured to start automatically upon login. You can also launch it immediately from your desktop Application Menu (Super / Windows key $\rightarrow$ search `Mem Reduct`), or run:
 
 ```bash
 memreduct-tray &
@@ -96,19 +117,22 @@ memreduct-tray &
 
 ### Language Selection
 Right-click on the tray icon $\rightarrow$ **`⚙ Settings`** $\rightarrow$ **`🌐 Language`** $\rightarrow$ Choose **`Русский`**, **`English`**, or **`Auto (System)`**.
+Your choice is saved persistently to `~/.config/memreduct/tray_config.json`.
 
 ---
 
 ## ⌨️ Global Hotkey Setup (GNOME / Wayland)
 
-To clean memory with a shortcut (e.g., `Ctrl+F1` or `Ctrl+Alt+M`):
+To bind a keyboard shortcut (e.g., `Ctrl+F1` or `Ctrl+Alt+M`) to instantly clean memory from any game or application:
+
 1. Open GNOME **Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **View and Customize Shortcuts** $\rightarrow$ **Custom Shortcuts**.
 2. Click **+** (Add Shortcut):
    * **Name**: `Mem Reduct Clean`
    * **Command**: `memreduct clean --all --notify`
-   * **Shortcut**: `Ctrl+F1` (or your preferred shortcut)
+   * **Shortcut**: Press your desired key combination (e.g., `Ctrl+F1`).
+3. Click **Add**.
 
-Now pressing your shortcut instantly frees memory and displays a desktop notification with the freed amount!
+Now pressing your shortcut will immediately optimize memory and show a desktop notification with the freed amount!
 
 ---
 
@@ -140,25 +164,46 @@ Memory Pressure (PSI):
  Full: 10s=0.00%, 60s=0.00%, 300s=0.00%
 ```
 
-### Live Terminal Monitor
+### Interactive Live Monitor
 ```bash
 memreduct watch
 ```
 
 ### Clean Memory
 ```bash
-# Clean all caches (pagecache, dentries, inodes)
-memreduct clean --caches
+# Clean all caches (pagecache, dentries, inodes) with notification
+memreduct clean --caches --notify
 
-# Full clean: all caches, memory compaction, and safe swap flush
-memreduct clean --all
+# Full clean: all caches, compaction, and safe swap flush
+memreduct clean --all --notify
 
 # Compact physical memory only
 memreduct clean --compact
 
-# Output results in JSON
+# Force specific output language (ru or en)
+memreduct --lang en status
+memreduct --lang ru clean --all
+
+# Output results in JSON for scripting
 memreduct clean --all --json
 ```
+
+---
+
+## 🗑 Uninstallation
+
+If you ever wish to remove Mem Reduct:
+
+* **If installed via `.deb` package:**
+  ```bash
+  sudo apt remove memreduct
+  ```
+
+* **If installed via standalone `.tar.gz` or source:**
+  ```bash
+  # From inside the extracted directory or repository:
+  sudo ./uninstall.sh
+  ```
 
 ---
 

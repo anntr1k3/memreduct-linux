@@ -8,7 +8,7 @@
   <a href="https://github.com/anntr1k3/memreduct-linux/releases"><img src="https://img.shields.io/github/v/release/anntr1k3/memreduct-linux?color=green" alt="Последний релиз" /></a>
   <img src="https://img.shields.io/badge/Язык-Rust_2024-orange.svg" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/Платформа-Linux%20(x86__64)-informational.svg" alt="Платформа" />
-  <img src="https://img.shields.io/badge/Лицензия-GPL--3.0-blue.svg" alt="Лицензия GPL-3.0" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Лицензия-GPL--3.0-blue.svg" alt="Лицензия GPL-3.0" /></a>
 </p>
 
 Высокопроизводительный легковесный системный монитор и инструмент очистки оперативной памяти для Linux, написанный на **100% чистом Rust** по мотивам классической утилиты [henrypp/memreduct](https://github.com/henrypp/memreduct).
@@ -212,8 +212,3 @@ memreduct clean --all --json
 1. **Разделение прав:** Графический интерфейс никогда не должен запускаться от `root`. Все привилегированные вызовы ядра изолированы в `memreduct-daemon`, работающем под управлением systemd с минимальным набором capabilities (`CAP_SYS_ADMIN`, `CAP_SYS_RESOURCE`).
 2. **Защита от OOM:** Сброс Swap (`swapoff -a`) в условиях нехватки RAM приводит к мгновенной аварии OOM Killer. `memreduct` проверяет наличие как минимум 20% свободного запаса в памяти перед выполнением сброса подкачки.
 3. **Безопасность данных:** Перед сбросом дисковых кэшей вызывается системный вызов ядра `libc::sync()`, принудительно сохраняющий все модифицированные страницы на физический накопитель.
-
----
-
-## 📄 Лицензия
-GPL-3.0-or-later

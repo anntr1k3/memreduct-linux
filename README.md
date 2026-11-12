@@ -8,7 +8,7 @@
   <a href="https://github.com/anntr1k3/memreduct-linux/releases"><img src="https://img.shields.io/github/v/release/anntr1k3/memreduct-linux?color=green" alt="Latest Release" /></a>
   <img src="https://img.shields.io/badge/Language-Rust_2024-orange.svg" alt="Rust 2024" />
   <img src="https://img.shields.io/badge/Platform-Linux%20(x86__64)-informational.svg" alt="Platform" />
-  <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="GPL-3.0 License" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="GPL-3.0 License" /></a>
 </p>
 
 A high-performance, lightweight system memory monitor and cleaner for Linux, written in **100% pure Rust** inspired by the classic [henrypp/memreduct](https://github.com/henrypp/memreduct).
@@ -215,8 +215,3 @@ If you ever wish to remove Mem Reduct:
    Flushing swap (`swapoff -a`) without sufficient free RAM will trigger the Linux OOM Killer. `memreduct` checks if `Available RAM > Swap Used * 1.2` before executing swap operations and safely aborts with an alert if memory is tight.
 3. **Pre-flush Sync:**
    Before dropping file caches, `libc::sync()` is executed to ensure modified pages are written to persistent storage, maximizing reclaimable page space.
-
----
-
-## 📄 License
-GPL-3.0-or-later
